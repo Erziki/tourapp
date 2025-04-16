@@ -1,0 +1,23 @@
+version: 1
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm install --legacy-peer-deps
+            # Set up environment variables properly
+            - env | grep -e NEXT_PUBLIC_ > .env.production
+            - env | grep -v -e NEXT_PUBLIC_ >> .env.production.local
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+        discard-paths: false
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*
+    appRoot: .

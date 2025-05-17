@@ -7,7 +7,8 @@ import {
   HeadObjectCommand,
   S3ServiceException 
 } from "@aws-sdk/client-s3";
-import { s3Client, S3_BUCKET_NAME } from "./s3-config";
+import { S3_BUCKET_NAME } from "./s3-config";
+import { createAuthenticatedS3Client } from "../auth/cognito-identity-utils";
 import type { TourData } from "@/components/VirtualTourEditor";
 import { validateTour } from "@/utils/validation";
 
@@ -25,6 +26,19 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 export const getUserPrefix = (userId: string): string => {
   return `users/${userId}/tours/`;
 };
+
+/**
+ * Gets an authenticated S3 client
+ * This is a wrapper function to handle any errors and retries
+ */
+async function getS3Client() {
+  try {
+    return await createAuthenticatedS3Client();
+  } catch (error) {
+    console.error("Error getting authenticated S3 client:", error);
+    throw error;
+  }
+}
 
 /**
  * Uploads a tour to S3 with retry logic
@@ -70,6 +84,9 @@ export const uploadTourToS3 = async (
       
       // Log the exact data being uploaded
       console.log(`Tour data being uploaded: ${tourToUpload.scenes.length} scenes`);
+      
+      // Get an authenticated S3 client
+      const s3Client = await getS3Client();
       
       const command = new PutObjectCommand({
         Bucket: S3_BUCKET_NAME,
@@ -146,6 +163,9 @@ export const getTourFromS3 = async (
     try {
       const key = `${getUserPrefix(userId)}${tourId}.json`;
       console.log(`Retrieving tour with key: ${key}`);
+      
+      // Get an authenticated S3 client
+      const s3Client = await getS3Client();
       
       const command = new GetObjectCommand({
         Bucket: S3_BUCKET_NAME,
@@ -236,6 +256,10 @@ export const listUserToursFromS3 = async (
   while (retries < MAX_RETRIES) {
     try {
       const prefix = getUserPrefix(userId);
+      
+      // Get an authenticated S3 client
+      const s3Client = await getS3Client();
+      
       const command = new ListObjectsV2Command({
         Bucket: S3_BUCKET_NAME,
         Prefix: prefix
@@ -310,6 +334,9 @@ export const tourExistsInS3 = async (
   const key = `${getUserPrefix(userId)}${tourId}.json`;
   
   try {
+    // Get an authenticated S3 client
+    const s3Client = await getS3Client();
+    
     const command = new HeadObjectCommand({
       Bucket: S3_BUCKET_NAME,
       Key: key
@@ -345,6 +372,9 @@ export const deleteTourFromS3 = async (
 
   while (retries < MAX_RETRIES) {
     try {
+      // Get an authenticated S3 client
+      const s3Client = await getS3Client();
+      
       // Create and execute delete command
       const deleteCommand = new DeleteObjectCommand({
         Bucket: S3_BUCKET_NAME,

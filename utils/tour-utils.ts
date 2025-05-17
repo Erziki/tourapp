@@ -1,6 +1,7 @@
 // utils/tour-utils.ts
 import { ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client, S3_BUCKET_NAME } from '@/lib/aws/s3-config';
+import { S3_BUCKET_NAME } from '@/lib/aws/s3-config';
+import { createAuthenticatedS3Client } from '@/lib/auth/cognito-identity-utils';
 
 /**
  * Find the user ID that owns a specific tour
@@ -9,6 +10,9 @@ import { s3Client, S3_BUCKET_NAME } from '@/lib/aws/s3-config';
  */
 export async function findUserIdForTour(tourId: string): Promise<string | null> {
   try {
+    // Get an authenticated S3 client
+    const s3Client = await createAuthenticatedS3Client();
+    
     // List all user directories
     const listCommand = new ListObjectsV2Command({
       Bucket: S3_BUCKET_NAME,

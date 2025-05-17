@@ -231,13 +231,18 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       let subscription;
       
-      // First try to get subscription directly from Cognito attributes
+      // First try to get subscription from Cognito attributes
       try {
         console.log('Attempting to get subscription from Cognito attributes');
         subscription = await getSubscriptionFromUserAttributes();
         console.log('Retrieved subscription from Cognito:', subscription);
       } catch (cognitoError) {
         console.warn('Could not retrieve subscription from Cognito:', cognitoError);
+        
+        // Check if we need to handle missing subscription attribute
+        if (cognitoError.message && cognitoError.message.includes('No subscription found')) {
+          console.log('No subscription attribute found in Cognito, will create a default one');
+        }
         
         // If Cognito fails, try the API
         try {
@@ -263,6 +268,14 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           // As a final fallback, use the free plan
           console.log('Falling back to default free subscription');
           subscription = DEFAULT_SUBSCRIPTION;
+          
+          // Try to store this default subscription in Cognito
+          try {
+            await storeSubscriptionInUserAttributes(subscription);
+            console.log('Successfully stored default free subscription in Cognito');
+          } catch (storageError) {
+            console.warn('Failed to store default subscription in Cognito:', storageError);
+          }
         }
       }
       
@@ -308,8 +321,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       return subscription;
     } catch (error) {
       console.error('Error fetching user subscription:', error);
-      setCurrentSubscription(DEFAULT_SUBSCRIPTION); // Fallback to free
-      return null;
+      // Ensure we always have a valid subscription by using the default free plan
+      const defaultSub = DEFAULT_SUBSCRIPTION;
+      setCurrentSubscription(defaultSub); 
+      return defaultSub;
     } finally {
       setIsLoading(false);
     }

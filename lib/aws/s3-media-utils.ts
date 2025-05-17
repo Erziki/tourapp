@@ -2,6 +2,7 @@
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client, S3_BUCKET_NAME } from "./s3-config";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createAuthenticatedS3Client } from "../auth/cognito-identity-utils";
 
 /**
  * Progress tracking function type
@@ -51,7 +52,7 @@ const getContentTypeFromFileName = (fileName: string): string => {
 
 /**
  * Uploads a media file (image/video) to S3 and returns the URL
- * This version does not use ACLs which may be disabled on some buckets
+ * This version uses authenticated credentials from Cognito Identity Pool
  * Supports progress tracking and abort signal
  */
 export const uploadMediaToS3 = async (
@@ -126,6 +127,9 @@ export const uploadMediaToS3 = async (
     }
     
     const contentType = file.type || getContentTypeFromFileName(file.name);
+
+    // Get an authenticated S3 client using Cognito Identity Pool credentials
+    const authenticatedS3Client = await createAuthenticatedS3Client();
     
     const uploadParams = {
       Bucket: S3_BUCKET_NAME,
@@ -147,8 +151,8 @@ export const uploadMediaToS3 = async (
 
     const command = new PutObjectCommand(uploadParams);
     
-    // Send the command with abort signal if provided
-    await s3Client.send(command, abortSignal ? { abortSignal } : undefined);
+    // Send the command with abort signal if provided, using the authenticated client
+    await authenticatedS3Client.send(command, abortSignal ? { abortSignal } : undefined);
     
     // Signal 100% progress when upload is complete
     if (onProgress) {
@@ -190,6 +194,9 @@ export const getSignedMediaUrl = async (
     }
 
     console.log("Getting signed URL for key:", key);
+    
+    // Get an authenticated S3 client using Cognito Identity Pool credentials
+    const authenticatedS3Client = await createAuthenticatedS3Client();
 
     const command = new GetObjectCommand({
       Bucket: S3_BUCKET_NAME,
@@ -197,7 +204,7 @@ export const getSignedMediaUrl = async (
     });
 
     // Generate a signed URL with the specified expiration
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn });
+    const signedUrl = await getSignedUrl(authenticatedS3Client, command, { expiresIn });
     console.log("Generated signed URL:", signedUrl);
     return signedUrl;
   } catch (error) {
@@ -252,6 +259,9 @@ export const uploadBase64ImageToS3 = async (
     const timestamp = new Date().getTime();
     const key = `${getMediaPrefix(userId)}images/${timestamp}-${fileName}`;
     
+    // Get an authenticated S3 client using Cognito Identity Pool credentials
+    const authenticatedS3Client = await createAuthenticatedS3Client();
+    
     const command = new PutObjectCommand({
       Bucket: S3_BUCKET_NAME,
       Key: key,
@@ -271,7 +281,7 @@ export const uploadBase64ImageToS3 = async (
       onProgress(60); // Signal upload is starting
     }
     
-    await s3Client.send(command);
+    await authenticatedS3Client.send(command);
     
     if (onProgress) {
       onProgress(100); // Signal upload is complete

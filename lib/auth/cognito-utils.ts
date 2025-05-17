@@ -137,6 +137,7 @@ export async function storeSubscriptionInUserAttributes(
 /**
  * Retrieves subscription data from user custom attributes
  * Makes sure Amplify is configured first
+ * Returns default free subscription if not found
  */
 export async function getSubscriptionFromUserAttributes() {
   try {
@@ -155,11 +156,25 @@ export async function getSubscriptionFromUserAttributes() {
         return JSON.parse(subscriptionJson);
       } catch (parseError) {
         console.error('Error parsing subscription JSON from Cognito:', parseError);
-        throw parseError;
+        // Fall back to default subscription if parsing fails
+        console.log('Falling back to default free subscription due to parsing error');
+        return getDefaultSubscription();
       }
     } else {
-      console.log('No custom:subscription attribute found in Cognito');
-      throw new Error('No subscription found in Cognito user attributes');
+      console.log('No custom:subscription attribute found in Cognito, using default free subscription');
+      
+      // Create and store a default subscription
+      const defaultSubscription = getDefaultSubscription();
+      
+      try {
+        // Store the default subscription for future use
+        await storeSubscriptionInUserAttributes(defaultSubscription);
+        console.log('Created and stored default subscription in Cognito');
+      } catch (storageError) {
+        console.warn('Could not store default subscription in Cognito:', storageError);
+      }
+      
+      return defaultSubscription;
     }
   } catch (error) {
     console.error('Error getting subscription from user attributes:', error);

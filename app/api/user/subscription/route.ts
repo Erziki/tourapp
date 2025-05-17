@@ -1,6 +1,8 @@
 // app/api/user/subscription/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getCognitoCurrentUser, storeSubscriptionInUserAttributes, getSubscriptionFromUserAttributes } from '@/lib/auth/cognito-utils';
+import { CognitoIdentityProviderClient, AdminUpdateUserAttributesCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { getCognitoCurrentUser, getSubscriptionFromUserAttributes, storeSubscriptionInUserAttributes } from '@/lib/auth/cognito-utils';
+import { createAuthenticatedCognitoClient } from '@/lib/auth/cognito-identity-utils';
 import { 
   getSubscription, 
   cancelSubscription, 
@@ -13,6 +15,9 @@ import { configureServerAmplify } from '@/lib/auth/server-amplify-config';
 
 // Configure Amplify for server-side use BEFORE using any Cognito functions
 configureServerAmplify();
+
+// AWS Region and User Pool ID from environment
+const USER_POOL_ID = process.env.NEXT_PUBLIC_USER_POOL_ID || '';
 
 /**
  * GET to retrieve user's subscription
@@ -140,8 +145,8 @@ export async function POST(req: NextRequest) {
       subscriptionId, 
       billingCycle = 'monthly',
       mode: providedMode,
-      changingBillingCycleOnly = false,  // Add support for billing cycle changes
-      previousSubscriptionId  // Add support for tracking the previous subscription when changing billing cycles
+      changingBillingCycleOnly = false,
+      previousSubscriptionId
     } = body;
     
     // Verify if we received a billing cycle
@@ -444,18 +449,6 @@ export async function DELETE(req: NextRequest) {
         
         await storeSubscriptionInUserAttributes(subscription);
         console.log('Successfully stored canceled subscription in Cognito');
-        
-        // Verify storage was successful
-        try {
-          const userAttributes = await fetchUserAttributes();
-          if (userAttributes['custom:subscription']) {
-            console.log('Verified cancellation data stored in Cognito');
-          } else {
-            console.warn('Verification check: custom:subscription attribute not found after cancellation storage');
-          }
-        } catch (verifyError) {
-          console.warn('Could not verify cancellation storage:', verifyError);
-        }
       } catch (storageError) {
         console.error('Error storing canceled subscription in user attributes:', storageError);
         // Continue processing and return subscription to client anyway
@@ -592,18 +585,6 @@ export async function PATCH(req: NextRequest) {
         
         await storeSubscriptionInUserAttributes(subscription);
         console.log('Successfully stored reactivated subscription in Cognito');
-        
-        // Verify storage was successful
-        try {
-          const userAttributes = await fetchUserAttributes();
-          if (userAttributes['custom:subscription']) {
-            console.log('Verified reactivation data stored in Cognito');
-          } else {
-            console.warn('Verification check: custom:subscription attribute not found after reactivation storage');
-          }
-        } catch (verifyError) {
-          console.warn('Could not verify reactivation storage:', verifyError);
-        }
       } catch (storageError) {
         console.error('Error storing reactivated subscription in user attributes:', storageError);
         // Continue processing and return subscription to client anyway

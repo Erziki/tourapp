@@ -1,6 +1,7 @@
 // utils/analytics-utils.ts
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client, S3_BUCKET_NAME } from '@/lib/aws/s3-config';
+import { S3_BUCKET_NAME } from '@/lib/aws/s3-config';
+import { createAuthenticatedS3Client } from '@/lib/auth/cognito-identity-utils';
 import { findUserIdForTour } from './tour-utils';
 
 interface VisitData {
@@ -51,6 +52,9 @@ export async function fetchTourEmbedAnalytics(tourId: string, userId?: string): 
         };
       }
     }
+    
+    // Get an authenticated S3 client
+    const s3Client = await createAuthenticatedS3Client();
     
     // User-specific path
     const prefix = `users/${userId}/analytics/tours/${tourId}/visits/`;
@@ -159,6 +163,9 @@ export async function fetchTourEmbedAnalytics(tourId: string, userId?: string): 
  */
 export async function fetchUserToursEmbedAnalytics(userId: string): Promise<Record<string, TourAnalytics>> {
   try {
+    // Get an authenticated S3 client
+    const s3Client = await createAuthenticatedS3Client();
+    
     // List all tours in the user's directory
     const prefix = `users/${userId}/tours/`;
     const command = new ListObjectsV2Command({
@@ -208,6 +215,9 @@ export async function fetchUserToursEmbedAnalytics(userId: string): Promise<Reco
  */
 export async function fetchAllToursEmbedAnalytics(): Promise<Record<string, TourAnalytics>> {
   try {
+    // Get an authenticated S3 client
+    const s3Client = await createAuthenticatedS3Client();
+    
     // List all user directories
     const prefix = 'users/';
     const command = new ListObjectsV2Command({
